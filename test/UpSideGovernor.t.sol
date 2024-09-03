@@ -13,7 +13,6 @@ import "../src/Counter/CounterV2.sol";
 import "../src/Counter/ICounterV2.sol";
 import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
-
 contract UpSideGovernorTest is Test {
     uint256 public constant VOTING_DELAY = 7200; // 1 day
     uint256 public constant VOTING_PERIOD = 50400; // 1 week
@@ -29,67 +28,91 @@ contract UpSideGovernorTest is Test {
 
     address public deployer;
     address public proposer;
-    address public voter;
+    address public voter1;
+    address public voter2;
+    address public voter3;
 
     function setUp() public {
         // address 초기화
         deployer = makeAddr("deployer");
         proposer = makeAddr("proposer");
-        voter = makeAddr("voter");
+        voter1 = makeAddr("voter1");
+        voter2 = makeAddr("voter2");
 
         vm.label(deployer, "deployer");
         vm.label(proposer, "proposer");
-        vm.label(voter, "voter");
+        vm.label(voter1, "voter1");
+        vm.label(voter2, "voter2");
 
         address[] memory proposers = new address[](1);
         address[] memory excutors = new address[](1);
         proposers[0] = proposer;
-        excutors[0] = address(this);
+        excutors[0] = proposer;
 
-        // deployer가 governor, token, counter를 배포
+        // deployer가 governor, token, timelock, counter를 배포
         vm.startPrank(deployer);
-        token = new UpSideToken(deployer);
-        governor = new UpSideGovernor(token, timelock);
-        timelock = new Timelock(1 days, proposers, excutors);
+        {
+            token = new UpSideToken(deployer);
+            timelock = new Timelock(1 days, proposers, excutors);
+            governor = new UpSideGovernor(token, timelock);
 
-        counterV1 = new CounterV1();
-        counterV2 = new CounterV2();
+            counterV1 = new CounterV1();
+            counterV2 = new CounterV2();
 
-        vm.label(address(token), "token");
-        vm.label(address(governor), "governor");
-        vm.label(address(timelock), "timelock");
+            vm.label(address(token), "token");
+            vm.label(address(governor), "governor");
+            vm.label(address(timelock), "timelock");
 
-        vm.label(address(counterV1), "counterV1");
-        vm.label(address(counterV2), "counterV2");
+            vm.label(address(counterV1), "counterV1");
+            vm.label(address(counterV2), "counterV2");
 
-        proxy = new ERC1967Proxy(address(counterV1), abi.encodeWithSignature("initialize()"));
+            proxy = new ERC1967Proxy(
+                address(counterV1),
+                abi.encodeWithSignature("initialize()")
+            );
 
-        // voter에게 VOTER_BALANCE만큼 토큰을 mint
-        token.mint(voter, VOTER_BALANCE);
+            address(proxy).call(
+                abi.encodeWithSignature(
+                    "transferOwnership(address)",
+                    address(timelock)
+                )
+            );
+            timelock.grantRole(timelock.PROPOSER_ROLE(), address(governor));
+            timelock.grantRole(timelock.EXECUTOR_ROLE(), address(governor));
 
+            // voter에게 VOTER_BALANCE만큼 토큰을 mint
+            token.mint(voter1, VOTER_BALANCE);
+            token.mint(voter2, VOTER_BALANCE);
+        }
         vm.stopPrank();
 
         // 투표권을 위임하기 전에 voter의 토큰 상태 확인
-        assertEq(token.getVotes(voter), 0);
+        assertEq(token.getVotes(voter1), 0);
 
         // voter가 자신에게 투표권을 위임
-        vm.prank(voter);
-        token.delegate(voter);
+        vm.prank(voter1);
+        token.delegate(voter1);
 
-        assertEq(token.balanceOf(voter), VOTER_BALANCE);
-        assertEq(token.delegates(voter), voter);
-        assertEq(token.getVotes(voter), VOTER_BALANCE);
+        // timelock.grantRole(timelock.PROPOSER_ROLE(), address(governor));
+
+        assertEq(token.balanceOf(voter1), VOTER_BALANCE);
+        assertEq(token.delegates(voter1), voter1);
+        assertEq(token.getVotes(voter1), VOTER_BALANCE);
     }
 
-    function test_Propose() public {
+    function test_Pending() public {
         address[] memory targets = new address[](1);
         uint256[] memory values = new uint256[](1);
         bytes[] memory calldatas = new bytes[](1);
         string memory description = "Upgrade to CounterV2";
 
-        targets[0] = address(counterV2);
+        targets[0] = address(proxy);
         values[0] = 0;
-        calldatas[0] = abi.encodeWithSignature("upgradeToAndCall(address,bytes)", address(counterV2), "");
+        calldatas[0] = abi.encodeWithSignature(
+            "upgradeToAndCall(address,bytes)",
+            address(counterV2),
+            ""
+        );
 
         bytes32 descriptionHash = keccak256(abi.encodePacked(description));
 
@@ -132,15 +155,20 @@ contract UpSideGovernorTest is Test {
         assertEq(governor.proposalDeadline(proposalId), voteEnd);
     }
 
-    function test_CastVote() public {
+    function test_Active() public {
+        // propose
         address[] memory targets = new address[](1);
         uint256[] memory values = new uint256[](1);
         bytes[] memory calldatas = new bytes[](1);
         string memory description = "Upgrade to CounterV2";
 
-        targets[0] = address(counterV2);
+        targets[0] = address(proxy);
         values[0] = 0;
-        calldatas[0] = abi.encodeWithSignature("upgradeToAndCall(address,bytes)", address(counterV2), "");
+        calldatas[0] = abi.encodeWithSignature(
+            "upgradeToAndCall(address,bytes)",
+            address(counterV2),
+            ""
+        );
 
         // proposer가 proposal을 생성
         vm.prank(proposer);
@@ -159,8 +187,9 @@ contract UpSideGovernorTest is Test {
         */
 
         // voter가 투표, 그러나 투표 기간이 아님
+
         vm.expectRevert();
-        vm.prank(voter);
+        vm.prank(voter1);
         governor.castVote(proposalId, 1);
 
         // 투표 기간으로 이동
@@ -177,14 +206,14 @@ contract UpSideGovernorTest is Test {
 
         // voter가 투표
         vm.expectEmit(true, true, true, true);
-        emit IGovernor.VoteCast(voter, proposalId, 1, VOTER_BALANCE, "");
+        emit IGovernor.VoteCast(voter1, proposalId, 1, VOTER_BALANCE, "");
 
-        vm.prank(voter);
+        vm.prank(voter1);
         uint256 weight = governor.castVote(proposalId, 1);
 
         // 투표 상태 확인
         assertEq(weight, VOTER_BALANCE);
-        assertEq(governor.hasVoted(proposalId, voter), true);
+        assertEq(governor.hasVoted(proposalId, voter1), true);
 
         (
             uint256 againstVotes,
@@ -197,15 +226,19 @@ contract UpSideGovernorTest is Test {
         assertGt(forVotes + abstainVotes, quorum);
     }
 
-    function test_Execute() public {
+    function test_Defeated() public {
         address[] memory targets = new address[](1);
         uint256[] memory values = new uint256[](1);
         bytes[] memory calldatas = new bytes[](1);
         string memory description = "Upgrade to CounterV2";
 
-        targets[0] = address(counterV2);
+        targets[0] = address(proxy);
         values[0] = 0;
-        calldatas[0] = abi.encodeWithSignature("upgradeToAndCall(address,bytes)", address(counterV2), "");
+        calldatas[0] = abi.encodeWithSignature(
+            "upgradeToAndCall(address,bytes)",
+            address(counterV2),
+            ""
+        );
 
         // proposer가 proposal을 생성
         vm.prank(proposer);
@@ -220,7 +253,47 @@ contract UpSideGovernorTest is Test {
         vm.roll(block.number + VOTING_DELAY + 1);
         vm.warp(block.timestamp + (VOTING_DELAY + 1) * 12);
 
-        vm.prank(voter);
+        vm.prank(voter1);
+        governor.castVote(proposalId, 2);
+
+        // 투표 마감으로 이동
+        vm.roll(block.number + VOTING_PERIOD + 1);
+        vm.warp(block.timestamp + (VOTING_PERIOD + 1) * 12);
+
+        assertEq(
+            uint256(governor.state(proposalId)),
+            uint256(IGovernor.ProposalState.Defeated)
+        );
+    }
+
+    function test_Queued() public {
+        address[] memory targets = new address[](1);
+        uint256[] memory values = new uint256[](1);
+        bytes[] memory calldatas = new bytes[](1);
+        string memory description = "Upgrade to CounterV2";
+
+        targets[0] = address(proxy);
+        values[0] = 0;
+        calldatas[0] = abi.encodeWithSignature(
+            "upgradeToAndCall(address,bytes)",
+            address(counterV2),
+            ""
+        );
+
+        // proposer가 proposal을 생성
+        vm.prank(proposer);
+        uint256 proposalId = governor.propose(
+            targets,
+            values,
+            calldatas,
+            description
+        );
+
+        // 투표 기간으로 이동
+        vm.roll(block.number + VOTING_DELAY + 1);
+        vm.warp(block.timestamp + (VOTING_DELAY + 1) * 12);
+
+        vm.prank(voter1);
         governor.castVote(proposalId, 1);
 
         // 투표 마감으로 이동
@@ -232,20 +305,81 @@ contract UpSideGovernorTest is Test {
             uint256(IGovernor.ProposalState.Succeeded)
         );
 
-        // proposal 실행
-        uint256 countBefore = counterV2.counter();
         bytes32 descriptionHash = keccak256(abi.encodePacked(description));
+        governor.queue(targets, values, calldatas, descriptionHash);
 
+        assertEq(
+            uint256(governor.state(proposalId)),
+            uint256(IGovernor.ProposalState.Queued)
+        );
+    }
+
+    function test_Execute() public {
+        address[] memory targets = new address[](1);
+        uint256[] memory values = new uint256[](1);
+        bytes[] memory calldatas = new bytes[](1);
+        string memory description = "Upgrade to CounterV2";
+
+        targets[0] = address(proxy);
+        values[0] = 0;
+        calldatas[0] = abi.encodeWithSignature(
+            "upgradeToAndCall(address,bytes)",
+            address(counterV2),
+            ""
+        );
+
+        // proposer가 proposal을 생성
+        vm.prank(proposer);
+        uint256 proposalId = governor.propose(
+            targets,
+            values,
+            calldatas,
+            description
+        );
+
+        // 투표 기간으로 이동
+        vm.roll(block.number + VOTING_DELAY + 1);
+        vm.warp(block.timestamp + (VOTING_DELAY + 1) * 12);
+
+        vm.prank(voter1);
+        governor.castVote(proposalId, 1);
+
+        // 투표 마감으로 이동
+        vm.roll(block.number + VOTING_PERIOD + 1);
+        vm.warp(block.timestamp + (VOTING_PERIOD + 1) * 12);
+
+        assertEq(
+            uint256(governor.state(proposalId)),
+            uint256(IGovernor.ProposalState.Succeeded)
+        );
+
+        bytes32 descriptionHash = keccak256(abi.encodePacked(description));
+        governor.queue(targets, values, calldatas, descriptionHash);
+
+        assertEq(
+            uint256(governor.state(proposalId)),
+            uint256(IGovernor.ProposalState.Queued)
+        );
+
+        vm.roll(block.number + 1 days + 1);
+        vm.warp(block.timestamp + (1 days + 1) * 12);
+
+        // proposal 실행
         vm.expectEmit(true, true, true, true);
         emit IGovernor.ProposalExecuted(proposalId);
+
         governor.execute(targets, values, calldatas, descriptionHash);
 
-        uint256 countAfter = counterV2.counter();
-
-        // assertEq(countBefore + 1, countAfter);
         assertEq(
             uint256(governor.state(proposalId)),
             uint256(IGovernor.ProposalState.Executed)
         );
+
+        // 실행 후 실제로 CounterV2로 업그레이드 되었는지 확인
+        (bool success, bytes memory returndata) = address(proxy).call(
+            abi.encodeWithSignature("version()")
+        );
+        require(success, "Call to version() failed");
+        assertEq(abi.decode(returndata, (string)), "V2");
     }
 }

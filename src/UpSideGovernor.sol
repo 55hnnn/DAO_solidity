@@ -26,7 +26,7 @@ contract UpSideGovernor is Governor, GovernorSettings, GovernorCountingSimple, G
         override(Governor, GovernorSettings)
         returns (uint256)
     {
-        return super.votingDelay();
+        return GovernorSettings.votingDelay();
     }
 
     function votingPeriod()
@@ -35,7 +35,7 @@ contract UpSideGovernor is Governor, GovernorSettings, GovernorCountingSimple, G
         override(Governor, GovernorSettings)
         returns (uint256)
     {
-        return super.votingPeriod();
+        return GovernorSettings.votingPeriod();
     }
 
     function quorum(uint256 blockNumber)
@@ -44,7 +44,7 @@ contract UpSideGovernor is Governor, GovernorSettings, GovernorCountingSimple, G
         override(Governor, GovernorVotesQuorumFraction)
         returns (uint256)
     {
-        return super.quorum(blockNumber);
+        return GovernorVotesQuorumFraction.quorum(blockNumber);
     }
 
     function state(uint256 proposalId)
@@ -53,7 +53,7 @@ contract UpSideGovernor is Governor, GovernorSettings, GovernorCountingSimple, G
         override(Governor, GovernorTimelockControl)
         returns (ProposalState)
     {
-        return super.state(proposalId);
+        return GovernorTimelockControl.state(proposalId);
     }
 
     function proposalNeedsQueuing(uint256 proposalId)
@@ -62,7 +62,7 @@ contract UpSideGovernor is Governor, GovernorSettings, GovernorCountingSimple, G
         override(Governor, GovernorTimelockControl)
         returns (bool)
     {
-        return super.proposalNeedsQueuing(proposalId);
+        return GovernorTimelockControl.proposalNeedsQueuing(proposalId);
     }
 
     function proposalThreshold()
@@ -71,7 +71,7 @@ contract UpSideGovernor is Governor, GovernorSettings, GovernorCountingSimple, G
         override(Governor, GovernorSettings)
         returns (uint256)
     {
-        return super.proposalThreshold();
+        return GovernorSettings.proposalThreshold();
     }
 
     function _queueOperations(uint256 proposalId, address[] memory targets, uint256[] memory values, bytes[] memory calldatas, bytes32 descriptionHash)
@@ -79,14 +79,14 @@ contract UpSideGovernor is Governor, GovernorSettings, GovernorCountingSimple, G
         override(Governor, GovernorTimelockControl)
         returns (uint48)
     {
-        return super._queueOperations(proposalId, targets, values, calldatas, descriptionHash);
+        return GovernorTimelockControl._queueOperations(proposalId, targets, values, calldatas, descriptionHash);
     }
 
     function _executeOperations(uint256 proposalId, address[] memory targets, uint256[] memory values, bytes[] memory calldatas, bytes32 descriptionHash)
         internal
         override(Governor, GovernorTimelockControl)
     {
-        super._executeOperations(proposalId, targets, values, calldatas, descriptionHash);
+        GovernorTimelockControl._executeOperations(proposalId, targets, values, calldatas, descriptionHash);
     }
 
     function _cancel(address[] memory targets, uint256[] memory values, bytes[] memory calldatas, bytes32 descriptionHash)
@@ -94,7 +94,7 @@ contract UpSideGovernor is Governor, GovernorSettings, GovernorCountingSimple, G
         override(Governor, GovernorTimelockControl)
         returns (uint256)
     {
-        return super._cancel(targets, values, calldatas, descriptionHash);
+        return GovernorTimelockControl._cancel(targets, values, calldatas, descriptionHash);
     }
 
     function _executor()
@@ -103,6 +103,6 @@ contract UpSideGovernor is Governor, GovernorSettings, GovernorCountingSimple, G
         override(Governor, GovernorTimelockControl)
         returns (address)
     {
-        return super._executor();
+        return GovernorTimelockControl._executor();
     }
 }
