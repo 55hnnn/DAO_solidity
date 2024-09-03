@@ -8,9 +8,7 @@ import "../src/UpSideToken.sol";
 import "../src/Timelock.sol";
 
 import "../src/Counter/CounterV1.sol";
-import "../src/Counter/ICounterV1.sol";
 import "../src/Counter/CounterV2.sol";
-import "../src/Counter/ICounterV2.sol";
 import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 contract UpSideGovernorTest is Test {
@@ -82,7 +80,7 @@ contract UpSideGovernorTest is Test {
 
             // voter에게 VOTER_BALANCE만큼 토큰을 mint
             token.mint(voter1, VOTER_BALANCE);
-            token.mint(voter2, VOTER_BALANCE);
+            token.mint(voter2, VOTER_BALANCE * 2);
         }
         vm.stopPrank();
 
@@ -381,5 +379,83 @@ contract UpSideGovernorTest is Test {
         );
         require(success, "Call to version() failed");
         assertEq(abi.decode(returndata, (string)), "V2");
+    }
+
+    function test_QuorumReached() public {
+        // 프로포절 생성
+        address[] memory targets = new address[](1);
+        uint256[] memory values = new uint256[](1);
+        bytes[] memory calldatas = new bytes[](1);
+        string memory description = "Upgrade to CounterV2";
+
+        targets[0] = address(this);
+        values[0] = 0;
+        calldatas[0] = abi.encodeWithSignature("someFunction()");
+
+        vm.prank(proposer);
+        uint256 proposalId = governor.propose(
+            targets,
+            values,
+            calldatas,
+            description
+        );
+
+        // 투표 기간으로 이동
+        vm.roll(block.number + governor.votingDelay() + 1);
+        vm.warp(block.timestamp + (governor.votingDelay() + 1) * 12);
+
+        // 투표 진행 (voter1의 투표)
+        vm.prank(voter1);
+        governor.castVote(proposalId, 1); // 1 = 찬성
+
+        // 정족수 확인
+        uint256 quorum = governor.quorum(block.number - 1);
+        assertEq(token.getPastVotes(voter1, block.number - 1), VOTER_BALANCE);
+        assertGt(token.getPastVotes(voter1, block.number - 1), quorum);
+
+        // 투표 종료로 이동
+        vm.roll(block.number + governor.votingPeriod() + 1);
+        vm.warp(block.timestamp + (governor.votingPeriod() + 1) * 12);
+
+        // 프로포절 상태가 Succeeded인지 확인 (quorum 충족)
+        assertEq(
+            uint256(governor.state(proposalId)),
+            uint256(IGovernor.ProposalState.Succeeded)
+        );
+    }
+
+    function test_QuorumNotReached() public {
+        address[] memory targets = new address[](1);
+        uint256[] memory values = new uint256[](1);
+        bytes[] memory calldatas = new bytes[](1);
+        string memory description = "Upgrade to CounterV2";
+
+        targets[0] = address(this);
+        values[0] = 0;
+        calldatas[0] = abi.encodeWithSignature("someFunction()");
+
+        vm.prank(proposer);
+        uint256 proposalId = governor.propose(
+            targets,
+            values,
+            calldatas,
+            description
+        );
+
+        // 투표 기간으로 이동
+        vm.roll(block.number + governor.votingDelay() + 1);
+        vm.warp(block.timestamp + (governor.votingDelay() + 1) * 12);
+
+        // 정족수 미달로 인해 투표하지 않음 (또는 너무 적게 투표)
+
+        // 투표 종료로 이동
+        vm.roll(block.number + governor.votingPeriod() + 1);
+        vm.warp(block.timestamp + (governor.votingPeriod() + 1) * 12);
+
+        // 프로포절 상태가 Defeated인지 확인 (quorum 미충족)
+        assertEq(
+            uint256(governor.state(proposalId)),
+            uint256(IGovernor.ProposalState.Defeated)
+        );
     }
 }

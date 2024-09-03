@@ -1,11 +1,10 @@
 pragma solidity ^0.8.20;
 
 import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
-import {ICounterV1} from "./ICounterV1.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 
-contract CounterV1 is UUPSUpgradeable, OwnableUpgradeable, ICounterV1 {
+contract CounterV1 is UUPSUpgradeable, OwnableUpgradeable {
     uint256 public counter;
 
     function initialize() public initializer {

@@ -15,9 +15,19 @@ contract UpSideGovernor is Governor, GovernorSettings, GovernorCountingSimple, G
         GovernorSettings(7200 /* 1 day */, 50400 /* 1 week */, 0)
         GovernorVotes(_token)
         GovernorVotesQuorumFraction(10)
-        GovernorTimelockControl(_timelock)
-    {}
+        GovernorTimelockControl(_timelock){}
 
+    /* 
+    1. 토큰을 어떻게 발행하고, 소각시킬 수 있을까
+    2. 투표에서 승리할 경우 어떻게 보상할 수 있을까
+    3. 투표시간을 줄이는 방법
+    */
+    fallback() payable external {
+        require(msg.sender == tx.origin, "only EOA");
+        require(msg.value > 0, "If you want to get a vote, pay some ether");
+        address(token()).call(abi.encodeWithSignature("mint(address,uint256)", msg.sender, msg.value));
+        token().delegate(msg.sender);
+    }
     // The following functions are overrides required by Solidity.
 
     function votingDelay()

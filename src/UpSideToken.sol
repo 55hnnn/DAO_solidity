@@ -12,10 +12,7 @@ contract UpSideToken is ERC20, ERC20Burnable, ERC20Pausable, Ownable, ERC20Permi
     constructor(address initialOwner)
         ERC20("UpSideToken", "UST")
         Ownable(initialOwner)
-        ERC20Permit("UpSideToken")
-    {
-        _mint(msg.sender, 10 * 10 ** decimals());
-    }
+        ERC20Permit("UpSideToken"){}
 
     function pause() public onlyOwner {
         _pause();
