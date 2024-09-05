@@ -22,11 +22,55 @@ contract UpSideGovernor is Governor, GovernorSettings, GovernorCountingSimple, G
     2. 투표에서 승리할 경우 어떻게 보상할 수 있을까
     3. 투표시간을 줄이는 방법
     */
-    fallback() payable external {
-        require(msg.sender == tx.origin, "only EOA");
-        require(msg.value > 0, "If you want to get a vote, pay some ether");
-        address(token()).call(abi.encodeWithSignature("mint(address,uint256)", msg.sender, msg.value));
-        token().delegate(msg.sender);
+    uint256[] _proposedList;
+    mapping(uint256 => bool) public proposalEndedEarly;
+
+    struct ProposalComponent {
+        address[] targets;
+        uint256[] values;
+        bytes[] calldatas;
+        bytes32 descriptionHash;
+    }
+
+    mapping(uint256 => ProposalComponent) public proposeItem;
+
+    function propose(address[] memory targets, uint256[] memory values, bytes[] memory calldatas, string memory description) public override returns (uint256){
+        uint256 proposalId = super.propose(targets, values, calldatas, description);
+        _proposedList.push(proposalId);
+        proposeItem[proposalId] = ProposalComponent({
+            targets: targets,
+            values: values,
+            calldatas: calldatas,
+            descriptionHash: keccak256(bytes(description))
+        });
+        return proposalId;
+    }
+
+    function getproposedList() external view returns (uint256[] memory) {
+        return _proposedList;
+    }
+
+    function endVoteEarly(uint256 proposalId) public {
+        ProposalState state = state(proposalId);
+        require(state == ProposalState.Active, "Vote is not active");
+
+        uint256 totalVotes = quorum(proposalSnapshot(proposalId));
+        if(totalVotes > 1) {
+            proposalEndedEarly[proposalId] = true;
+        }
+    }
+
+    function Queue(uint256 proposalId) external returns (uint256) {
+        ProposalComponent storage proposal = proposeItem[proposalId];
+        return queue(proposal.targets, proposal.values, proposal.calldatas, proposal.descriptionHash);
+    }
+    function Execute(uint256 proposalId) external returns (uint256) {
+        ProposalComponent storage proposal = proposeItem[proposalId];
+        return execute(proposal.targets, proposal.values, proposal.calldatas, proposal.descriptionHash);
+    }
+    function Cancel(uint256 proposalId) external returns (uint256) {
+        ProposalComponent storage proposal = proposeItem[proposalId];
+        return cancel(proposal.targets, proposal.values, proposal.calldatas, proposal.descriptionHash);
     }
     // The following functions are overrides required by Solidity.
 
@@ -63,6 +107,9 @@ contract UpSideGovernor is Governor, GovernorSettings, GovernorCountingSimple, G
         override(Governor, GovernorTimelockControl)
         returns (ProposalState)
     {
+        if (proposalEndedEarly[proposalId]){
+            return ProposalState.Succeeded;
+        }
         return GovernorTimelockControl.state(proposalId);
     }
 
@@ -113,6 +160,10 @@ contract UpSideGovernor is Governor, GovernorSettings, GovernorCountingSimple, G
         override(Governor, GovernorTimelockControl)
         returns (address)
     {
-        return GovernorTimelockControl._executor();
+        return msg.sender;
+        // return GovernorTimelockControl._executor();
+    }
+    function _checkGovernance() internal override {
+        require(_executor()==msg.sender);
     }
 }

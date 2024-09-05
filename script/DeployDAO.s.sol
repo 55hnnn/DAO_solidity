@@ -32,37 +32,34 @@ contract DeployScript is Script {
             abi.encodeWithSignature("initialize()")
         );
 
-        Timelock timelock = new Timelock(
-            1 days,
-            deployerArrAddress,
-            deployerArrAddress
-        );
+        // Timelock timelock = new Timelock(1 days, deployerArrAddress, deployerArrAddress);
+        Timelock timelock = new Timelock(1, deployerArrAddress, deployerArrAddress);
         UpSideToken token = new UpSideToken(deployerAddress);
         UpSideGovernor governor = new UpSideGovernor(token, timelock);
 
-        address(proxy).call(
-            abi.encodeWithSignature(
-                "transferOwnership(address)",
-                address(timelock)
-            )
-        );
-        address(token).call(
-            abi.encodeWithSignature(
-                "transferOwnership(address)", 
-                address(governor)
-            )
-        );
+        // address(proxy).call(
+        //     abi.encodeWithSignature(
+        //         "transferOwnership(address)",
+        //         address(timelock)
+        //     )
+        // );
+        // address(token).call(
+        //     abi.encodeWithSignature(
+        //         "transferOwnership(address)", 
+        //         address(governor)
+        //     )
+        // );
         timelock.grantRole(timelock.PROPOSER_ROLE(), address(governor));
         timelock.grantRole(timelock.EXECUTOR_ROLE(), address(governor));
 
         // 배포된 컨트랙트의 주소 출력
-        console.log("counterV1 deployed to:", address(counterV1));
-        console.log("counterV2 deployed to:", address(counterV2));
-        console.log("proxy deployed to:", address(proxy));
+        console.log("export COUNTERV1=%s", address(counterV1));
+        console.log("export COUNTERV2=%s", address(counterV2));
+        console.log("export PROXY=%s", address(proxy));
 
-        console.log("timelock deployed to:", address(timelock));
-        console.log("token deployed to:", address(token));
-        console.log("governor deployed to:", address(governor));
+        console.log("export TIMELOCK=%s", address(timelock));
+        console.log("export TOKEN=%s", address(token));
+        console.log("export GOVERNOR=%s", address(governor));
 
         vm.stopBroadcast();
     }

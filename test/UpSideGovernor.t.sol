@@ -352,7 +352,8 @@ contract UpSideGovernorTest is Test {
         );
 
         bytes32 descriptionHash = keccak256(abi.encodePacked(description));
-        governor.queue(targets, values, calldatas, descriptionHash);
+        // governor.queue(targets, values, calldatas, descriptionHash);
+        governor.Queue(proposalId);
 
         assertEq(
             uint256(governor.state(proposalId)),
@@ -366,7 +367,8 @@ contract UpSideGovernorTest is Test {
         vm.expectEmit(true, true, true, true);
         emit IGovernor.ProposalExecuted(proposalId);
 
-        governor.execute(targets, values, calldatas, descriptionHash);
+        // governor.execute(targets, values, calldatas, descriptionHash);
+        governor.Execute(proposalId);
 
         assertEq(
             uint256(governor.state(proposalId)),
