@@ -26,6 +26,14 @@ contract UpSideToken is ERC20, ERC20Burnable, ERC20Pausable, Ownable, ERC20Permi
         _mint(to, amount);
     }
 
+    function getVotes(address account) public view override whenNotPaused returns (uint256) {
+        return super.getVotes(account);
+    }
+
+    function delegate(address delegatee) public override whenNotPaused {
+        super.delegate(delegatee);
+    }
+
     // The following functions are overrides required by Solidity.
 
     function _update(address from, address to, uint256 value)
