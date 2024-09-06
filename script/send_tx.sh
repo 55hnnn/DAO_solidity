@@ -1,6 +1,7 @@
 # 배포
-forge script script/DeployDAO.s.sol --rpc-url http://localhost:8545 --broadcast  
-
+forge script script/DeployDAO.s.sol --rpc-url http://localhost:8545 --broadcast
+export USER_ADDR=0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
+export PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
 # 세팅
     # 투표 시작 시간 바꾸기 1블록으로
 cast send $GOVERNOR "setVotingDelay(uint48)" 1 --private-key $PRIVATE_KEY
@@ -28,6 +29,8 @@ cast send $GOVERNOR "Queue(uint256)" $PROPOSALID --private-key $PRIVATE_KEY
     # 토큰 관련
         # 토큰 민팅
 cast send $TOKEN "mint(address,uint256)" $USER_ADDR 1ether --private-key $PRIVATE_KEY
+cast send $TOKEN "exchangeToken()" --value 1ether --private-key $PRIVATE_KEY
+cast send $TOKEN "exchangeEther(uint256)" 1ether --private-key $PRIVATE_KEY
         # 토큰 잔액
 cast call $TOKEN "balanceOf(address)(uint256)" $USER_ADDR
         # 토큰 총 발행량

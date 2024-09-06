@@ -34,6 +34,17 @@ contract UpSideToken is ERC20, ERC20Burnable, ERC20Pausable, Ownable, ERC20Permi
         super.delegate(delegatee);
     }
 
+    function exchangeToken() external payable whenNotPaused {
+        require(msg.value > 0, "give me some ether");
+        _mint(msg.sender, msg.value);
+    }
+
+    function exchangeEther(uint256 amount) external whenNotPaused {
+        require(balanceOf(msg.sender) >= amount, "not enough token balance");
+        burn(amount);
+        address(msg.sender).call{value: amount}("");
+    }
+
     // The following functions are overrides required by Solidity.
 
     function _update(address from, address to, uint256 value)

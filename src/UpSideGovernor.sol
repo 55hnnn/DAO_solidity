@@ -12,16 +12,11 @@ import "@openzeppelin/contracts/governance/extensions/GovernorTimelockControl.so
 contract UpSideGovernor is Governor, GovernorSettings, GovernorCountingSimple, GovernorVotes, GovernorVotesQuorumFraction, GovernorTimelockControl {
     constructor(IVotes _token, TimelockController _timelock)
         Governor("UpSideGovernor")
-        GovernorSettings(7200 /* 1 day */, 50400 /* 1 week */, 0)
+        GovernorSettings(5 /* 1 min */, 50 /* 10 min */, 0)
         GovernorVotes(_token)
         GovernorVotesQuorumFraction(10)
         GovernorTimelockControl(_timelock){}
 
-    /* 
-    1. 토큰을 어떻게 발행하고, 소각시킬 수 있을까
-    2. 투표에서 승리할 경우 어떻게 보상할 수 있을까
-    3. 투표시간을 줄이는 방법
-    */
     uint256[] _proposedList;
     mapping(uint256 => bool) public proposalEndedEarly;
 
